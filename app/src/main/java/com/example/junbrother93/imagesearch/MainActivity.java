@@ -6,15 +6,20 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.text.DynamicLayout;
 import android.text.method.ScrollingMovementMethod;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewDebug;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.GridLayout;
@@ -62,31 +67,156 @@ public class MainActivity extends AppCompatActivity {
     private PhotoInfo[] photoInfo;
 
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        eTxtSearch = (EditText)findViewById(R.id.txtSearch);
-        btnSearch = (Button)findViewById(R.id.btnSearch);
-       // txtResult = (TextView)findViewById(R.id.txtResult);
-       // txtResult.setMovementMethod(new ScrollingMovementMethod());
+        eTxtSearch = (EditText) findViewById(R.id.txtSearch);
+        btnSearch = (Button) findViewById(R.id.btnSearch);
         dynamicLayout = (GridLayout) findViewById(R.id.dynamicLayout);
         nImage = 0;
 
+        eTxtSearch.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                switch (actionId) {
+                    default:
+                        Volley();
+                        return false;
+                }
+            }
+        });
     }
 
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.btnSearch:
+                Volley();
+        }
+    }
+    private void Volley()
+    {
+        RequestQueue queue = Volley.newRequestQueue(this);
+        String url = "https://secure.flickr.com/services/rest/?method=flickr.photos.search&api_key=6832a4fb7e1f14b87fa3cac4f52e0594&text=";
+        String url3 = "&safe_search=1&content_type=1&sort=interestingness-desc&format=json";
 
-                RequestQueue queue = Volley.newRequestQueue(this);
-                String url = "https://secure.flickr.com/services/rest/?method=flickr.photos.search&api_key=6832a4fb7e1f14b87fa3cac4f52e0594&text=";
-                String url3 = "&safe_search=1&content_type=1&sort=interestingness-desc&format=json";
+        url = url + eTxtSearch.getText() + url3;
+        StringRequest request = new StringRequest(Request.Method.POST, url,
+                //요청 성공 시
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        Log.d("result", "[" + response + "]");
+                        String result = response;
+                        result = result.replace("jsonFlickrApi(", "");
+                        result = result.replace(")", "");
 
-                url = url + eTxtSearch.getText() + url3;
-                StringRequest request = new StringRequest(Request.Method.POST, url,
+                        try {
+                            deleteDynamicArea();    //  그리드 뷰 내 이미지 뷰 다 지우기
+
+                            JSONObject jsonObject = new JSONObject(result);
+                            JSONObject jsonObjectPhotos = jsonObject.getJSONObject("photos");
+                            JSONArray jsonArrayPhoto = jsonObjectPhotos.getJSONArray("photo");
+
+                            int length = jsonArrayPhoto.length();
+
+                            photoInfo = new PhotoInfo[length];
+                            for (int i = 0; i < 100; i++) {
+                                volleyThread(jsonArrayPhoto, i);
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+
+                        // txtResult.setText(result);
+
+                    }
+                },
+                // 에러 발생 시
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Log.d("error", "[" + error.getMessage() + "]");
+                    }
+                });
+        queue.add(request);
+    }
+    private void addDynamicArea(int n, final String url, Bitmap b, final String filename) throws IOException {
+        final ImageView dynamicImageView = new ImageView(this);
+        dynamicImageView.setId(DYNAMIC_VIEW_ID + n);
+        dynamicImageView.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this, SubActivity.class);
+                intent.putExtra("url", url);
+                intent.putExtra("filename", filename);
+                startActivity(intent);
+            }
+        });
+        dynamicImageView.setMaxHeight(1);
+        dynamicImageView.setMaxWidth(1);
+        dynamicImageView.setPadding(20, 20, 20, 20);
+        dynamicImageView.setScaleType(ImageView.ScaleType.FIT_START);
+        dynamicImageView.setTag(url);
+        dynamicImageView.setImageBitmap(b);
+        Log.d("setImage", "setImage");
+
+        final Handler handler = new Handler(Looper.getMainLooper()) //UI 작업 처리를 위해 UI쓰레드에 바인딩 된 handler를 만듦
+        {
+            public void handleMessage(Message mag) {
+                dynamicLayout.addView(dynamicImageView, LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            }
+        };
+
+        new Thread()    // UI작업 처리 쓰레드
+        {
+            public void run() {
+                Message message = handler.obtainMessage();
+                handler.sendMessage(message);
+            }
+        }.start();
+    }
+
+    private void deleteDynamicArea() {
+        dynamicLayout.removeAllViews();
+        nImage = 0;
+    }
+
+    private void volleyThread(final JSONArray jsonArrayPhoto, final int i) {
+        final Thread mThread = new Thread() {
+            @Override
+            public void run() {
+                JSONObject jsonObjectPhotoInfo = null;
+                try {
+                    jsonObjectPhotoInfo = jsonArrayPhoto.getJSONObject(i);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                photoInfo[i] = new PhotoInfo();
+                photoInfo[i].setFarm_id(jsonObjectPhotoInfo.optString("farm"));
+                photoInfo[i].setServer_id(jsonObjectPhotoInfo.optString("server"));
+                photoInfo[i].setId(jsonObjectPhotoInfo.optString("id"));
+                photoInfo[i].setSecret(jsonObjectPhotoInfo.optString("secret"));
+                imageThread(i);   // 그리드 내 이미지 뷰 추가
+            }
+        };
+        mThread.start();
+    }
+
+    private void setURLThread(final int n) {
+
+        String getimageURL = "https://secure.flickr.com/services/rest/?method=flickr.photos.getSizes&api_key=6832a4fb7e1f14b87fa3cac4f52e0594&photo_id=";
+        getimageURL = getimageURL + photoInfo[n].getId() + "&format=json";
+        final String finalGetimageURL = getimageURL;
+
+        final Thread mThread = new Thread() {
+            @Override
+            public void run() {
+                RequestQueue queue = Volley.newRequestQueue(MainActivity.this);
+
+                StringRequest request = new StringRequest(Request.Method.POST, finalGetimageURL,
                         //요청 성공 시
                         new Response.Listener<String>() {
                             @Override
@@ -94,39 +224,30 @@ public class MainActivity extends AppCompatActivity {
                                 Log.d("result", "[" + response + "]");
                                 String result = response;
                                 result = result.replace("jsonFlickrApi(", "");
-                                result = result.replace(")","");
-
-                                try{
-                                    deleteDynamicArea();    //  그리드 뷰 내 이미지 뷰 다 지우기
-
+                                result = result.replace(")", "");
+                                try {
                                     JSONObject jsonObject = new JSONObject(result);
-                                    JSONObject jsonObjectPhotos = jsonObject.getJSONObject("photos");
-                                    JSONArray jsonArrayPhoto = jsonObjectPhotos.getJSONArray("photo");
+                                    JSONObject jsonObjectSizes = jsonObject.getJSONObject("sizes");
+                                    JSONArray jsonArraySize = jsonObjectSizes.getJSONArray("size");
+                                    int length = jsonArraySize.length();
 
-                                    int length = jsonArrayPhoto.length();
-
-                                    photoInfo = new PhotoInfo[length];
-
-
-                                    for(int i=0; i < 12; i++)
-                                    {
-                                        JSONObject jsonObjectPhotoInfo = jsonArrayPhoto.getJSONObject(i);
-                                        photoInfo[i] = new PhotoInfo();
-                                        photoInfo[i].setFarm_id(jsonObjectPhotoInfo.optString("farm"));
-                                        photoInfo[i].setServer_id(jsonObjectPhotoInfo.optString("server"));
-                                        photoInfo[i].setId(jsonObjectPhotoInfo.optString("id"));
-                                        photoInfo[i].setSecret(jsonObjectPhotoInfo.optString("secret"));
-                                        addDynamicArea();   // 그리드 내 이미지 뷰 추가
+                                    for (int i = 0; i < length; i++) {
+                                        JSONObject jsonObjectPhotoInfo = jsonArraySize.getJSONObject(i);
+                                        if(jsonObjectPhotoInfo.optString("label").equals("Small"))
+                                        {
+                                            photoInfo[n].setsURL(jsonObjectPhotoInfo.optString("label"));
+                                            imageThread(n);
+                                        }
+                                        else if(jsonObjectPhotoInfo.optString("label").equals("Original"))
+                                        {
+                                            photoInfo[n].setoURL(jsonObjectPhotoInfo.optString("label"));
+                                        }
+                                        else
+                                            continue;
                                     }
-                                }
-                                catch (JSONException e){
-                                    e.printStackTrace();
-                                } catch (IOException e) {
+                                } catch (JSONException e) {
                                     e.printStackTrace();
                                 }
-
-                                // txtResult.setText(result);
-
                             }
                         },
                         // 에러 발생 시
@@ -135,79 +256,63 @@ public class MainActivity extends AppCompatActivity {
                             public void onErrorResponse(VolleyError error) {
                                 Log.d("error", "[" + error.getMessage() + "]");
                             }
-                        }) ;
+                        });
                 queue.add(request);
-        }
+            }
+        };
+        mThread.start();
     }
 
-    private void addDynamicArea() throws IOException {
+    private void imageThread(final int nCount) {
         nImage++;
-        String tempURL="https://farm";
 
-        String farm_id = photoInfo[nImage-1].getFarm_id();
-        String server_id = photoInfo[nImage-1].getServer_id();
-        String id = photoInfo[nImage-1].getId();
-        String secret = photoInfo[nImage-1].getSecret();
+
+        String tempURL = "https://farm";
+
+        String farm_id = photoInfo[nCount].getFarm_id();
+        String server_id = photoInfo[nCount].getServer_id();
+        final String id = photoInfo[nCount].getId();
+        String secret = photoInfo[nCount].getSecret();
 
         tempURL = tempURL + farm_id + ".staticflickr.com/" + server_id + "/" + id + "_" + secret + "_n.jpg";
 
-        final URL url = new URL(tempURL);
 
 
-        Thread mThread = new Thread(){
+        URL url = null;
+        try {
+            url = new URL(tempURL);
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+
+        final URL finalUrl = url;
+
+        final String finalTempURL = tempURL;
+        Thread mThread = new Thread() {
             @Override
-            public void run(){
+            public void run() {
                 try {
-                    Log.d("0", url.toString());
-                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    Log.d("0", finalUrl.toString());
+                    HttpURLConnection conn = (HttpURLConnection) finalUrl.openConnection();
                     conn.setDoInput(true);
                     conn.connect();
 
                     InputStream inputStream = conn.getInputStream();
                     BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
                     bitmap = BitmapFactory.decodeStream(bufferedInputStream);
-                } catch(MalformedURLException e)
-                {
+                } catch (MalformedURLException e) {
                     e.printStackTrace();
-                }catch (IOException e){
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                try {
+                    addDynamicArea(nImage, finalTempURL, bitmap, id);
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
         };
-
         mThread.start();
-
-
-        try{
-            mThread.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-
-        final ImageView dynamicImageView = new ImageView(this);
-        dynamicImageView.setId(DYNAMIC_VIEW_ID + nImage);
-        dynamicImageView.setOnClickListener(new OnClickListener()
-        {
-            @Override
-            public void onClick(View v)
-            {
-                Intent intent = new Intent(MainActivity.this, SubActivity.class);
-                intent.putExtra("url", v.getTag().toString());
-                startActivity(intent);
-            }
-        });
-        dynamicImageView.setMaxHeight(1);
-        dynamicImageView.setMaxWidth(1);
-        dynamicImageView.setPadding(20,20,20,20);
-        dynamicImageView.setScaleType(ImageView.ScaleType.FIT_START);
-        dynamicImageView.setTag(tempURL);
-        dynamicImageView.setImageBitmap(bitmap);
-        Log.d("setImage", "setImage");
-        dynamicLayout.addView(dynamicImageView, LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-    }
-    private void deleteDynamicArea() {
-        dynamicLayout.removeAllViews();
-        nImage = 0;
     }
 }
+
