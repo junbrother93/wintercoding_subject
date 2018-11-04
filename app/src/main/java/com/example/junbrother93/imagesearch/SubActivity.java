@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.android.volley.Request;
@@ -27,6 +28,7 @@ import com.gun0912.tedpermission.TedPermission;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.w3c.dom.Text;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -50,6 +52,8 @@ public class SubActivity extends Activity {
     private String originalSizeURL;
     private String Id;
     private String filename;
+    private TextView txtLoading;
+
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
@@ -57,13 +61,10 @@ public class SubActivity extends Activity {
         setContentView(R.layout.activity_sub);
         selectImage = (ImageView)findViewById(R.id.selectImage);
         btnSave = (Button)findViewById(R.id.btnSave);
+        txtLoading = (TextView)findViewById(R.id.txtLoading);
 
         Intent intent = getIntent();
-
-        //URL = intent.getStringExtra("url");
         Id = intent.getStringExtra("id");
-
-        //URL = URL.replaceAll("_n.jpg", ".jpg");
         Volley(Id);
     }
 
@@ -136,7 +137,7 @@ public class SubActivity extends Activity {
 
                             originalSizeURL = jsonArraySize.getJSONObject(length-1).optString("source");
                             Log.d("URL", originalSizeURL);
-                            volleyThread(originalSizeURL);
+                            imageLoadingThread(originalSizeURL);
 
                         } catch (JSONException e) {
                             e.printStackTrace();
@@ -153,7 +154,7 @@ public class SubActivity extends Activity {
         queue.add(request);
     }
 
-    private void volleyThread(final String originalSizeURL) {
+    private void imageLoadingThread(final String originalSizeURL) {
         URL url = null;
         try {
             url = new URL(originalSizeURL);
@@ -191,5 +192,6 @@ public class SubActivity extends Activity {
         selectImage.setScaleType(ImageView.ScaleType.FIT_START);
         selectImage.setImageBitmap(bitmap);
         mAttacher = new PhotoViewAttacher(selectImage);
+        txtLoading.setVisibility(View.INVISIBLE);
     }
 }

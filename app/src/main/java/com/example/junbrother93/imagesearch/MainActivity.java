@@ -65,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
     private Bitmap bitmap;
     private int nImage;
     private PhotoInfo[] photoInfo;
-
+    private String smallSizeURL;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -126,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
 
                             photoInfo = new PhotoInfo[length];
 
-                            for (int i = 0; i < 30; i++) {  // 30개만..
+                            for (int i = 0; i < 30; i++) {
                                 volleyThread(jsonArrayPhoto, i);
                             }
                         } catch (JSONException e) {
@@ -160,39 +160,68 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
                 photoInfo[i] = new PhotoInfo();
-                photoInfo[i].setFarm_id(jsonObjectPhotoInfo.optString("farm"));
-                photoInfo[i].setServer_id(jsonObjectPhotoInfo.optString("server"));
+                //photoInfo[i].setFarm_id(jsonObjectPhotoInfo.optString("farm"));
+                //photoInfo[i].setServer_id(jsonObjectPhotoInfo.optString("server"));
                 photoInfo[i].setId(jsonObjectPhotoInfo.optString("id"));
-                photoInfo[i].setSecret(jsonObjectPhotoInfo.optString("secret"));
-                imageThread(i);   // 그리드 내 이미지 뷰 추가
+                //photoInfo[i].setSecret(jsonObjectPhotoInfo.optString("secret"));
+                getSmallImageURL(photoInfo[i].getId());   // 이미지 URL 구하기
             }
         };
         mThread.start();
     }
 
-    private void imageThread(final int nCount) {
+    private void getSmallImageURL(final String id)
+    {
+        RequestQueue queue = Volley.newRequestQueue(this);
+        String url = "https://secure.flickr.com/services/rest/?method=flickr.photos.getSizes&api_key=6832a4fb7e1f14b87fa3cac4f52e0594&photo_id=";
+        url = url + id + "&format=json";
+        Log.d("url " , url);
+
+        StringRequest request = new StringRequest(Request.Method.POST, url,
+                //요청 성공 시
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        Log.d("result", "[" + response + "]");
+                        String result = response;
+                        result = result.replace("jsonFlickrApi(", "");
+                        result = result.replace(")", "");
+
+                        try {
+                            JSONObject jsonObject = new JSONObject(result);
+                            JSONObject jsonObjectSizes = jsonObject.getJSONObject("sizes");
+                            JSONArray jsonArraySize = jsonObjectSizes.getJSONArray("size");
+                            smallSizeURL = jsonArraySize.getJSONObject(4).optString("source");
+                            Log.d("URL", smallSizeURL);
+                            imageLoadingThread(smallSizeURL, id);
+
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                },
+                // 에러 발생 시
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Log.d("error", "[" + error.getMessage() + "]");
+                    }
+                });
+        queue.add(request);
+    }
+
+    private void imageLoadingThread(final String smallSizeURL, final String id) {
         nImage++;
-
-
-        String tempURL = "https://farm";
-
-        String farm_id = photoInfo[nCount].getFarm_id();
-        String server_id = photoInfo[nCount].getServer_id();
-        final String id = photoInfo[nCount].getId();
-        String secret = photoInfo[nCount].getSecret();
-
-        tempURL = tempURL + farm_id + ".staticflickr.com/" + server_id + "/" + id + "_" + secret + "_n.jpg";
 
         URL url = null;
         try {
-            url = new URL(tempURL);
+            url = new URL(smallSizeURL);
         } catch (MalformedURLException e) {
             e.printStackTrace();
         }
 
         final URL finalUrl = url;
 
-        final String finalTempURL = tempURL;
         Thread mThread = new Thread() {
             @Override
             public void run() {
@@ -211,7 +240,7 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
                 try {
-                    addDynamicArea(nImage, finalTempURL, bitmap, id);
+                    addDynamicArea(nImage,  bitmap, id);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -220,21 +249,19 @@ public class MainActivity extends AppCompatActivity {
         mThread.start();
     }
 
-    private void addDynamicArea(int n, final String url, Bitmap b, final String id) throws IOException {
+    private void addDynamicArea(int n, Bitmap b, final String id) throws IOException {
         final ImageView dynamicImageView = new ImageView(this);
         dynamicImageView.setId(DYNAMIC_VIEW_ID + n);
         dynamicImageView.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 Intent intent = new Intent(MainActivity.this, SubActivity.class);
-                intent.putExtra("url", url);
                 intent.putExtra("id", id);
                 startActivity(intent);
             }
         });
         dynamicImageView.setPadding(20, 20, 20, 20);
         dynamicImageView.setScaleType(ImageView.ScaleType.FIT_START);
-        dynamicImageView.setTag(url);
         dynamicImageView.setImageBitmap(b);
         Log.d("setImage", "setImage");
 

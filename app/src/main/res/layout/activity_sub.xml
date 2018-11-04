@@ -6,12 +6,12 @@
     android:orientation="vertical">
 
     <TextView
-        android:id ="@+id/txtLoading"
-        android:text="불러오는 중"
+        android:id="@+id/txtLoading"
+        android:layout_gravity="center"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:text="원본 이미지 불러오는 중" />
     <ImageView
-        android:text
         android:id="@+id/selectImage"
         android:layout_width="match_parent"
         android:layout_height="460dp" />
