@@ -75,6 +75,7 @@ public class MainActivity extends AppCompatActivity {
         eTxtSearch = (EditText) findViewById(R.id.txtSearch);
         btnSearch = (Button) findViewById(R.id.btnSearch);
         dynamicLayout = (GridLayout) findViewById(R.id.dynamicLayout);
+
         nImage = 0;
 
         eTxtSearch.setOnEditorActionListener(new TextView.OnEditorActionListener() {
@@ -96,6 +97,7 @@ public class MainActivity extends AppCompatActivity {
                 Volley();
         }
     }
+
     private void Volley()
     {
         RequestQueue queue = Volley.newRequestQueue(this);
@@ -123,15 +125,13 @@ public class MainActivity extends AppCompatActivity {
                             int length = jsonArrayPhoto.length();
 
                             photoInfo = new PhotoInfo[length];
-                            for (int i = 0; i < 100; i++) {
+
+                            for (int i = 0; i < 30; i++) {  // 30개만..
                                 volleyThread(jsonArrayPhoto, i);
                             }
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
-
-                        // txtResult.setText(result);
-
                     }
                 },
                 // 에러 발생 시
@@ -142,41 +142,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
         queue.add(request);
-    }
-    private void addDynamicArea(int n, final String url, Bitmap b, final String filename) throws IOException {
-        final ImageView dynamicImageView = new ImageView(this);
-        dynamicImageView.setId(DYNAMIC_VIEW_ID + n);
-        dynamicImageView.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, SubActivity.class);
-                intent.putExtra("url", url);
-                intent.putExtra("filename", filename);
-                startActivity(intent);
-            }
-        });
-        dynamicImageView.setMaxHeight(1);
-        dynamicImageView.setMaxWidth(1);
-        dynamicImageView.setPadding(20, 20, 20, 20);
-        dynamicImageView.setScaleType(ImageView.ScaleType.FIT_START);
-        dynamicImageView.setTag(url);
-        dynamicImageView.setImageBitmap(b);
-        Log.d("setImage", "setImage");
-
-        final Handler handler = new Handler(Looper.getMainLooper()) //UI 작업 처리를 위해 UI쓰레드에 바인딩 된 handler를 만듦
-        {
-            public void handleMessage(Message mag) {
-                dynamicLayout.addView(dynamicImageView, LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            }
-        };
-
-        new Thread()    // UI작업 처리 쓰레드
-        {
-            public void run() {
-                Message message = handler.obtainMessage();
-                handler.sendMessage(message);
-            }
-        }.start();
     }
 
     private void deleteDynamicArea() {
@@ -203,6 +168,89 @@ public class MainActivity extends AppCompatActivity {
             }
         };
         mThread.start();
+    }
+
+    private void imageThread(final int nCount) {
+        nImage++;
+
+
+        String tempURL = "https://farm";
+
+        String farm_id = photoInfo[nCount].getFarm_id();
+        String server_id = photoInfo[nCount].getServer_id();
+        final String id = photoInfo[nCount].getId();
+        String secret = photoInfo[nCount].getSecret();
+
+        tempURL = tempURL + farm_id + ".staticflickr.com/" + server_id + "/" + id + "_" + secret + "_n.jpg";
+
+        URL url = null;
+        try {
+            url = new URL(tempURL);
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+
+        final URL finalUrl = url;
+
+        final String finalTempURL = tempURL;
+        Thread mThread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    Log.d("0", finalUrl.toString());
+                    HttpURLConnection conn = (HttpURLConnection) finalUrl.openConnection();
+                    conn.setDoInput(true);
+                    conn.connect();
+
+                    InputStream inputStream = conn.getInputStream();
+                    BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
+                    bitmap = BitmapFactory.decodeStream(bufferedInputStream);
+                } catch (MalformedURLException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                try {
+                    addDynamicArea(nImage, finalTempURL, bitmap, id);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        mThread.start();
+    }
+
+    private void addDynamicArea(int n, final String url, Bitmap b, final String id) throws IOException {
+        final ImageView dynamicImageView = new ImageView(this);
+        dynamicImageView.setId(DYNAMIC_VIEW_ID + n);
+        dynamicImageView.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this, SubActivity.class);
+                intent.putExtra("url", url);
+                intent.putExtra("id", id);
+                startActivity(intent);
+            }
+        });
+        dynamicImageView.setPadding(20, 20, 20, 20);
+        dynamicImageView.setScaleType(ImageView.ScaleType.FIT_START);
+        dynamicImageView.setTag(url);
+        dynamicImageView.setImageBitmap(b);
+        Log.d("setImage", "setImage");
+
+        final Handler handler = new Handler(Looper.getMainLooper()) //UI 작업 처리를 위해 UI쓰레드에 바인딩 된 handler를 만듦
+        {
+            public void handleMessage(Message mag) {
+                dynamicLayout.addView(dynamicImageView, LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            }
+        };
+        new Thread()    // UI작업 처리 쓰레드
+        {
+            public void run() {
+                Message message = handler.obtainMessage();
+                handler.sendMessage(message);
+            }
+        }.start();
     }
 
     private void setURLThread(final int n) {
@@ -258,58 +306,6 @@ public class MainActivity extends AppCompatActivity {
                             }
                         });
                 queue.add(request);
-            }
-        };
-        mThread.start();
-    }
-
-    private void imageThread(final int nCount) {
-        nImage++;
-
-
-        String tempURL = "https://farm";
-
-        String farm_id = photoInfo[nCount].getFarm_id();
-        String server_id = photoInfo[nCount].getServer_id();
-        final String id = photoInfo[nCount].getId();
-        String secret = photoInfo[nCount].getSecret();
-
-        tempURL = tempURL + farm_id + ".staticflickr.com/" + server_id + "/" + id + "_" + secret + "_n.jpg";
-
-
-
-        URL url = null;
-        try {
-            url = new URL(tempURL);
-        } catch (MalformedURLException e) {
-            e.printStackTrace();
-        }
-
-        final URL finalUrl = url;
-
-        final String finalTempURL = tempURL;
-        Thread mThread = new Thread() {
-            @Override
-            public void run() {
-                try {
-                    Log.d("0", finalUrl.toString());
-                    HttpURLConnection conn = (HttpURLConnection) finalUrl.openConnection();
-                    conn.setDoInput(true);
-                    conn.connect();
-
-                    InputStream inputStream = conn.getInputStream();
-                    BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
-                    bitmap = BitmapFactory.decodeStream(bufferedInputStream);
-                } catch (MalformedURLException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                try {
-                    addDynamicArea(nImage, finalTempURL, bitmap, id);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
             }
         };
         mThread.start();

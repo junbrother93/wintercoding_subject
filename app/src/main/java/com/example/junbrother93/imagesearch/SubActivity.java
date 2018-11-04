@@ -37,7 +37,8 @@ public class SubActivity extends Activity {
     private ImageView selectImage;
     PhotoViewAttacher mAttacher;
     private Button btnSave;
-    private String tempURL2;
+    private String URL;
+    private String Id;
     private String filename;
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -49,15 +50,18 @@ public class SubActivity extends Activity {
         btnSave = (Button)findViewById(R.id.btnSave);
 
         Intent intent = getIntent();
-        tempURL2 = intent.getStringExtra("url");
-        tempURL2 = tempURL2.replaceAll("_n.jpg", ".jpg");
+
+        URL = intent.getStringExtra("url");
+        Id = intent.getStringExtra("Id");
+
+        URL = URL.replaceAll("_n.jpg", ".jpg");
 
         filename = intent.getStringExtra("filename");
 
-        Log.d("0", tempURL2);
+        Log.d("0", URL);
         URL url2 = null;
         try {
-            url2 = new URL(tempURL2);
+            url2 = new URL(URL);
         } catch (MalformedURLException e) {
             e.printStackTrace();
         }
@@ -96,7 +100,6 @@ public class SubActivity extends Activity {
         switch (view.getId()) {
             case R.id.btnSave:
             {
-                showPermissionDialog();
                 saveImage(filename, bitmap);
             }
         }
@@ -105,6 +108,7 @@ public class SubActivity extends Activity {
     private void saveImage(String filename, Bitmap bitmap) {
         String StoragePath = Environment.getExternalStorageDirectory().getAbsolutePath();
         String savePath = StoragePath;
+        showPermissionDialog(savePath);
         File f = new File(savePath);
         if(!f.isDirectory())f.mkdirs();
         FileOutputStream fos;
@@ -116,11 +120,11 @@ public class SubActivity extends Activity {
         }
     }
 
-    private void showPermissionDialog() {
+    private void showPermissionDialog(final String savePath) {
         PermissionListener permissionListener = new PermissionListener() {
             @Override
             public void onPermissionGranted() {
-                Toast.makeText(SubActivity.this, "저장 완료.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(SubActivity.this, savePath + "/Downloads/ 폴더에 저장", Toast.LENGTH_SHORT).show();
             }
 
             @Override
