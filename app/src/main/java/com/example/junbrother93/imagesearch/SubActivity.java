@@ -15,8 +15,18 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.gun0912.tedpermission.PermissionListener;
 import com.gun0912.tedpermission.TedPermission;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -37,7 +47,7 @@ public class SubActivity extends Activity {
     private ImageView selectImage;
     PhotoViewAttacher mAttacher;
     private Button btnSave;
-    private String URL;
+    private String originalSizeURL;
     private String Id;
     private String filename;
     @Override
@@ -46,54 +56,15 @@ public class SubActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_sub);
         selectImage = (ImageView)findViewById(R.id.selectImage);
-        mAttacher = new PhotoViewAttacher(selectImage);
         btnSave = (Button)findViewById(R.id.btnSave);
 
         Intent intent = getIntent();
 
-        URL = intent.getStringExtra("url");
-        Id = intent.getStringExtra("Id");
+        //URL = intent.getStringExtra("url");
+        Id = intent.getStringExtra("id");
 
-        URL = URL.replaceAll("_n.jpg", ".jpg");
-
-        filename = intent.getStringExtra("filename");
-
-        Log.d("0", URL);
-        URL url2 = null;
-        try {
-            url2 = new URL(URL);
-        } catch (MalformedURLException e) {
-            e.printStackTrace();
-        }
-
-        final URL finalUrl = url2;
-
-        Thread mThread = new Thread(){
-            @Override
-            public void run(){
-                try {
-                    HttpURLConnection conn = (HttpURLConnection) finalUrl.openConnection();
-                    conn.setDoInput(true);
-                    conn.connect();
-
-                    InputStream inputStream = conn.getInputStream();
-                    BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
-                    bitmap = BitmapFactory.decodeStream(bufferedInputStream);
-                } catch(MalformedURLException e)
-                {
-                    e.printStackTrace();
-                }catch (IOException e){
-                    e.printStackTrace();
-                }
-            }
-        };
-        mThread.start();
-        try{
-            mThread.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        selectImage.setImageBitmap(bitmap);
+        //URL = URL.replaceAll("_n.jpg", ".jpg");
+        Volley(Id);
     }
 
     public void onClick(View view) {
@@ -138,5 +109,87 @@ public class SubActivity extends Activity {
                 .setRationaleMessage("쓰기 권한 필요")
                 .setPermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 .check();
+    }
+
+    private void Volley(String id)
+    {
+        RequestQueue queue = Volley.newRequestQueue(this);
+        String url = "https://secure.flickr.com/services/rest/?method=flickr.photos.getSizes&api_key=6832a4fb7e1f14b87fa3cac4f52e0594&photo_id=";
+        url = url + id + "&format=json";
+        Log.d("url " , url);
+
+        StringRequest request = new StringRequest(Request.Method.POST, url,
+                //요청 성공 시
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        Log.d("result", "[" + response + "]");
+                        String result = response;
+                        result = result.replace("jsonFlickrApi(", "");
+                        result = result.replace(")", "");
+
+                        try {
+                            JSONObject jsonObject = new JSONObject(result);
+                            JSONObject jsonObjectSizes = jsonObject.getJSONObject("sizes");
+                            JSONArray jsonArraySize = jsonObjectSizes.getJSONArray("size");
+                            int length = jsonArraySize.length();
+
+                            originalSizeURL = jsonArraySize.getJSONObject(length-1).optString("source");
+                            Log.d("URL", originalSizeURL);
+                            volleyThread(originalSizeURL);
+
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                },
+                // 에러 발생 시
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Log.d("error", "[" + error.getMessage() + "]");
+                    }
+                });
+        queue.add(request);
+    }
+
+    private void volleyThread(final String originalSizeURL) {
+        URL url = null;
+        try {
+            url = new URL(originalSizeURL);
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+
+        final URL finalUrl = url;
+
+        final Thread mThread = new Thread(){
+            @Override
+            public void run(){
+                try {
+                    HttpURLConnection conn = (HttpURLConnection) finalUrl.openConnection();
+                    conn.setDoInput(true);
+                    conn.connect();
+
+                    InputStream inputStream = conn.getInputStream();
+                    BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
+                    bitmap = BitmapFactory.decodeStream(bufferedInputStream);
+                } catch(MalformedURLException e)
+                {
+                    e.printStackTrace();
+                }catch (IOException e){
+                    e.printStackTrace();
+                }
+            }
+        };
+        mThread.start();
+        try{
+            mThread.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        selectImage.setScaleType(ImageView.ScaleType.FIT_START);
+        selectImage.setImageBitmap(bitmap);
+        mAttacher = new PhotoViewAttacher(selectImage);
     }
 }

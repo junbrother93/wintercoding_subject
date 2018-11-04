@@ -5,7 +5,13 @@
     android:layout_width="match_parent"
     android:orientation="vertical">
 
+    <TextView
+        android:id ="@+id/txtLoading"
+        android:text="불러오는 중"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
     <ImageView
+        android:text
         android:id="@+id/selectImage"
         android:layout_width="match_parent"
         android:layout_height="460dp" />
