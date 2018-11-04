@@ -28,7 +28,6 @@ import com.gun0912.tedpermission.TedPermission;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.w3c.dom.Text;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -50,10 +49,9 @@ public class SubActivity extends Activity {
     PhotoViewAttacher mAttacher;
     private Button btnSave;
     private String originalSizeURL;
-    private String Id;
+    private String id;
     private String filename;
     private TextView txtLoading;
-
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
@@ -64,39 +62,41 @@ public class SubActivity extends Activity {
         txtLoading = (TextView)findViewById(R.id.txtLoading);
 
         Intent intent = getIntent();
-        Id = intent.getStringExtra("id");
-        Volley(Id);
+        id = intent.getStringExtra("id");
+
+        Volley(id);
     }
 
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.btnSave:
             {
-                saveImage(filename, bitmap);
+                saveImage(id, bitmap);
             }
         }
     }
 
     private void saveImage(String filename, Bitmap bitmap) {
+        showPermissionDialog();
         String StoragePath = Environment.getExternalStorageDirectory().getAbsolutePath();
         String savePath = StoragePath;
-        showPermissionDialog(savePath);
         File f = new File(savePath);
         if(!f.isDirectory())f.mkdirs();
         FileOutputStream fos;
         try{
             fos = new FileOutputStream(savePath+"/Download/"+filename+".jpg");
             bitmap.compress(Bitmap.CompressFormat.JPEG, 80, fos);
+            Toast.makeText(SubActivity.this, savePath + "/Downloads/ 폴더에 저장", Toast.LENGTH_SHORT).show();
         }catch(Exception e){
             e.printStackTrace();
         }
     }
 
-    private void showPermissionDialog(final String savePath) {
+    private void showPermissionDialog() {
         PermissionListener permissionListener = new PermissionListener() {
             @Override
             public void onPermissionGranted() {
-                Toast.makeText(SubActivity.this, savePath + "/Downloads/ 폴더에 저장", Toast.LENGTH_SHORT).show();
+                Toast.makeText(SubActivity.this, "권한 Ok.", Toast.LENGTH_SHORT).show();
             }
 
             @Override
@@ -193,5 +193,6 @@ public class SubActivity extends Activity {
         selectImage.setImageBitmap(bitmap);
         mAttacher = new PhotoViewAttacher(selectImage);
         txtLoading.setVisibility(View.INVISIBLE);
+        btnSave.setEnabled(true);
     }
 }
